@@ -28,9 +28,9 @@
 #include <cstring>
 #include <cstdio>
 
-// ---------------------------------------------------------------------------
-// Logging (writes to DoW2_UIFix.log next to the DLL, for debugging)
-// ---------------------------------------------------------------------------
+ // ---------------------------------------------------------------------------
+ // Logging (writes to DoW2_UIFix.log next to the DLL, for debugging)
+ // ---------------------------------------------------------------------------
 static void Log(const char* fmt, ...)
 {
     char buf[512];
@@ -65,7 +65,7 @@ static bool SafePatch(void* addr, const void* newBytes, size_t len)
 // Scan [start, start+size) for a byte pattern.
 // '?' in the pattern array is a wildcard (value ignored, mask byte = 0).
 static uint8_t* SigScan(uint8_t* start, size_t size,
-                         const uint8_t* pattern, const uint8_t* mask, size_t patLen)
+    const uint8_t* pattern, const uint8_t* mask, size_t patLen)
 {
     if (patLen == 0 || size < patLen) return nullptr;
 
@@ -119,7 +119,7 @@ static uint8_t* SigScan(uint8_t* start, size_t size,
  *   2. As a fallback, NOP the conditional branch that enforces the cap.
  */
 
-// Max scale to allow.  4.0 is fine for up to ~7680-wide.  Raise if needed.
+ // Max scale to allow.  4.0 is fine for up to ~7680-wide.  Raise if needed.
 static const float MAX_UI_SCALE = 4.0f;
 
 // ---- Strategy 1: patch the float constant in .rdata ----------------------
@@ -136,18 +136,18 @@ static bool PatchFloatCap(uint8_t* base, size_t imageSize)
 {
     // Find the .rdata section header
     IMAGE_DOS_HEADER* dos = (IMAGE_DOS_HEADER*)base;
-    IMAGE_NT_HEADERS* nt  = (IMAGE_NT_HEADERS*)(base + dos->e_lfanew);
+    IMAGE_NT_HEADERS* nt = (IMAGE_NT_HEADERS*)(base + dos->e_lfanew);
     IMAGE_SECTION_HEADER* sec = IMAGE_FIRST_SECTION(nt);
 
     uint8_t* rdataStart = nullptr;
-    size_t   rdataSize  = 0;
+    size_t   rdataSize = 0;
 
     for (int i = 0; i < nt->FileHeader.NumberOfSections; ++i)
     {
         if (strncmp((char*)sec[i].Name, ".rdata", 6) == 0)
         {
             rdataStart = base + sec[i].VirtualAddress;
-            rdataSize  = sec[i].Misc.VirtualSize;
+            rdataSize = sec[i].Misc.VirtualSize;
             break;
         }
     }
@@ -171,13 +171,13 @@ static bool PatchFloatCap(uint8_t* base, size_t imageSize)
         0x00, 0x00, 0x00, 0x40    // 2.0f
     );
     MASK(triplet,
-        1,1,1,1,
-        1,1,1,1,
-        1,1,1,1
+        1, 1, 1, 1,
+        1, 1, 1, 1,
+        1, 1, 1, 1
     );
 
     uint8_t* hit = SigScan(rdataStart, rdataSize,
-                            triplet_pat, triplet_mask, sizeof(triplet_pat));
+        triplet_pat, triplet_mask, sizeof(triplet_pat));
 
     if (!hit)
     {
@@ -185,9 +185,9 @@ static bool PatchFloatCap(uint8_t* base, size_t imageSize)
 
         // Fallback: find first standalone 1.0f in .rdata
         PATTERN(single, 0x00, 0x00, 0x80, 0x3F);
-        MASK(single,    1,    1,    1,    1   );
+        MASK(single, 1, 1, 1, 1);
         hit = SigScan(rdataStart, rdataSize,
-                      single_pat, single_mask, sizeof(single_pat));
+            single_pat, single_mask, sizeof(single_pat));
         if (!hit)
         {
             Log("  Could not find 1.0f cap constant in .rdata");
@@ -226,18 +226,18 @@ static bool PatchFloatCap(uint8_t* base, size_t imageSize)
 static bool PatchClampBranch(uint8_t* base, size_t imageSize)
 {
     IMAGE_DOS_HEADER* dos = (IMAGE_DOS_HEADER*)base;
-    IMAGE_NT_HEADERS* nt  = (IMAGE_NT_HEADERS*)(base + dos->e_lfanew);
+    IMAGE_NT_HEADERS* nt = (IMAGE_NT_HEADERS*)(base + dos->e_lfanew);
     IMAGE_SECTION_HEADER* sec = IMAGE_FIRST_SECTION(nt);
 
     uint8_t* textStart = nullptr;
-    size_t   textSize  = 0;
+    size_t   textSize = 0;
 
     for (int i = 0; i < nt->FileHeader.NumberOfSections; ++i)
     {
         if (strncmp((char*)sec[i].Name, ".text", 5) == 0)
         {
             textStart = base + sec[i].VirtualAddress;
-            textSize  = sec[i].Misc.VirtualSize;
+            textSize = sec[i].Misc.VirtualSize;
             break;
         }
     }
@@ -253,21 +253,21 @@ static bool PatchClampBranch(uint8_t* base, size_t imageSize)
     //  D9 46 0C  D8 1D ?? ?? ?? ??  DF E0  F6 C4 41  75 ??
     PATTERN(branch,
         0xD9, 0x46, 0x0C,             // fld [esi+0Ch]
-        0xD8, 0x1D, 0,0,0,0,          // fcomp ds:[????]   (wildcard addr)
+        0xD8, 0x1D, 0, 0, 0, 0,          // fcomp ds:[????]   (wildcard addr)
         0xDF, 0xE0,                   // fnstsw ax
         0xF6, 0xC4, 0x41,             // test ah, 41h
         0x75, 0                       // jne short ??
     );
     MASK(branch,
-        1,1,1,
-        1,1,0,0,0,0,
-        1,1,
-        1,1,1,
-        1,0
+        1, 1, 1,
+        1, 1, 0, 0, 0, 0,
+        1, 1,
+        1, 1, 1,
+        1, 0
     );
 
     uint8_t* hit = SigScan(textStart, textSize,
-                            branch_pat, branch_mask, sizeof(branch_pat));
+        branch_pat, branch_mask, sizeof(branch_pat));
 
     if (!hit)
     {
@@ -310,8 +310,8 @@ static DWORD WINAPI PatchThread(LPVOID)
     uint8_t* base = (uint8_t*)exe;
 
     IMAGE_DOS_HEADER* dos = (IMAGE_DOS_HEADER*)base;
-    IMAGE_NT_HEADERS* nt  = (IMAGE_NT_HEADERS*)(base + dos->e_lfanew);
-    size_t imageSize      = nt->OptionalHeader.SizeOfImage;
+    IMAGE_NT_HEADERS* nt = (IMAGE_NT_HEADERS*)(base + dos->e_lfanew);
+    size_t imageSize = nt->OptionalHeader.SizeOfImage;
 
     Log("Module base: %p, image size: 0x%zx", base, imageSize);
 
